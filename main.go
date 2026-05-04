@@ -9,6 +9,13 @@ import (
 	"time"
 )
 
+const adminTemplate = `<html>
+  <body>
+    <h1>Welcome, Chirpy Admin</h1>
+    <p>Chirpy has been visited %d times!</p>
+  </body>
+</html>`
+
 type apiConfig struct {
 	fileserverHits atomic.Int32
 }
@@ -23,7 +30,7 @@ func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 func (cfg *apiConfig) showHits(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "Hits: %d", cfg.fileserverHits.Load())
+	fmt.Fprintf(w, adminTemplate, cfg.fileserverHits.Load())
 }
 
 func (cfg *apiConfig) resetHits(w http.ResponseWriter, r *http.Request) {
@@ -48,9 +55,9 @@ func main() {
 	apiCfg := new(apiConfig)
 
 	mux.Handle("/app/", http.StripPrefix("/app/", apiCfg.middlewareMetricsInc(http.FileServer(http.Dir(".")))))
-	mux.HandleFunc("GET /healthz", readinessHandler)
-	mux.HandleFunc("GET /metrics", apiCfg.showHits)
-	mux.HandleFunc("POST /reset", apiCfg.resetHits)
+	mux.HandleFunc("GET /api/healthz", readinessHandler)
+	mux.HandleFunc("GET /admin/metrics", apiCfg.showHits)
+	mux.HandleFunc("POST /admin/reset", apiCfg.resetHits)
 
 	log.Printf("http server starting on port: %s", port)
 	log.Fatal(server.ListenAndServe())
