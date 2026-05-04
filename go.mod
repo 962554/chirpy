@@ -1,3 +1,3 @@
 module github.com/962554/chirpy
 
-go 1.25.0
+go 1.26.2
