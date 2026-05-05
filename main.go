@@ -2,11 +2,17 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"sync/atomic"
 	"time"
+
+	"github.com/962554/chirpy/internal/database"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 const adminTemplate = `<html>
@@ -18,6 +24,7 @@ const adminTemplate = `<html>
 
 type apiConfig struct {
 	fileserverHits atomic.Int32
+	dbQueries      *database.Queries
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -44,6 +51,13 @@ func main() {
 		port        = ":8080"
 		readTimeout = 5 * time.Second
 	)
+	godotenv.Load()
+	dbURL := os.Getenv("DB_URL")
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Fatalf("error opening db: %s", err)
+	}
+	dbQueries := database.New(db)
 
 	mux := http.NewServeMux()
 	server := &http.Server{
