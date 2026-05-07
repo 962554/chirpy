@@ -20,7 +20,7 @@ const adminTemplate = `<html>
   </body>
 </html>`
 
-var apiCfg = new(apiConfig)
+var apiCfg = &apiConfig{platform: "dev"}
 
 func main() {
 	const (
