@@ -2,12 +2,9 @@
 // Copyright © 2026 P, Rich
 // License: MIT, see LICENSE for details
 
-// This package
-
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -31,13 +28,12 @@ func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 
 func (cfg *apiConfig) showHits(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, adminTemplate, cfg.fileserverHits.Load())
+	writeMessage(w, http.StatusOK, fmt.Appendf([]byte{}, adminTemplate, cfg.fileserverHits.Load()))
 }
 
 func (cfg *apiConfig) resetHits(w http.ResponseWriter, r *http.Request) {
 	if cfg.platform != "dev" {
-		w.WriteHeader(403)
+		writeMessage(w, 403, []byte{})
 		return
 	}
 	cfg.fileserverHits.Store(0)
@@ -46,5 +42,5 @@ func (cfg *apiConfig) resetHits(w http.ResponseWriter, r *http.Request) {
 		log.Printf("error deleting users from db: %s", err)
 	}
 	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
+	writeMessage(w, http.StatusOK, []byte{})
 }

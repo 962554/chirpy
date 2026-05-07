@@ -5,7 +5,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -36,15 +35,13 @@ func createUsersHandler(w http.ResponseWriter, r *http.Request) {
 	email := email{}
 	err := decoder.Decode(&email)
 	if err != nil {
-		w.WriteHeader(400)
-		w.Write([]byte(fmt.Sprintf(errJSON, "problem decoding email")))
+		writeMessage(w, 400, fmt.Appendf([]byte{}, errJSON, "problem decoding email"))
 		return
 	}
 
 	user, err := apiCfg.dbQueries.CreateUser(r.Context(), email.Email)
 	if err != nil {
-		w.WriteHeader(400)
-		w.Write([]byte(fmt.Sprintf(errJSON, "problem creating user")))
+		writeMessage(w, 400, fmt.Appendf([]byte{}, errJSON, "problem creating user"))
 		return
 	}
 
@@ -57,10 +54,8 @@ func createUsersHandler(w http.ResponseWriter, r *http.Request) {
 
 	dat, err := json.Marshal(u)
 	if err != nil {
-		w.WriteHeader(500)
-		w.Write([]byte(fmt.Sprintf(errJSON, "problem marshalling user to JSON")))
+		writeMessage(w, 500, fmt.Appendf([]byte{}, errJSON, "problem marshalling user to JSON"))
 		return
 	}
-	w.WriteHeader(201)
-	w.Write(dat)
+	writeMessage(w, 201, dat)
 }

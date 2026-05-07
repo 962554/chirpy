@@ -27,15 +27,16 @@ func main() {
 		port        = ":8080"
 		readTimeout = 5 * time.Second
 	)
+
 	godotenv.Load()
 	dbURL := os.Getenv("DB_URL")
+
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatalf("error opening db: %s", err)
 	}
 
 	apiCfg.dbQueries = database.New(db)
-	apiCfg.platform = "dev"
 
 	mux := http.NewServeMux()
 	server := &http.Server{
@@ -57,6 +58,10 @@ func main() {
 
 func readinessHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(http.StatusText(http.StatusOK)))
+	writeMessage(w, http.StatusOK, []byte(http.StatusText(http.StatusOK)))
+}
+
+func writeMessage(w http.ResponseWriter, httpCode int, message []byte) {
+	w.WriteHeader(httpCode)
+	w.Write(message)
 }

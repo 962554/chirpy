@@ -37,17 +37,14 @@ func validateHandler(w http.ResponseWriter, r *http.Request) {
 	chirp := Chirp{}
 	err := decoder.Decode(&chirp)
 	if err != nil {
-		w.WriteHeader(400)
-		w.Write([]byte(errChirp))
+		writeMessage(w, 400, []byte(errChirp))
 		return
 	}
 	if len(chirp.Body) > maxLength {
-		w.WriteHeader(400)
-		w.Write([]byte(errTooLong))
+		writeMessage(w, 400, []byte(errTooLong))
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf(cleaned, clean(chirp.Body))))
+	writeMessage(w, http.StatusOK, fmt.Appendf([]byte{}, cleaned, clean(chirp.Body)))
 }
 
 func clean(in string) string {
