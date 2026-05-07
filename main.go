@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -25,6 +26,7 @@ const adminTemplate = `<html>
 type apiConfig struct {
 	fileserverHits atomic.Int32
 	dbQueries      *database.Queries
+	platform       string
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -41,10 +43,20 @@ func (cfg *apiConfig) showHits(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) resetHits(w http.ResponseWriter, r *http.Request) {
+	if cfg.platform != "dev" {
+		w.WriteHeader(403)
+		return
+	}
 	cfg.fileserverHits.Store(0)
+	err := cfg.dbQueries.DeleteUsers(context.TODO())
+	if err != nil {
+		log.Printf("error deleting users from db: %s", err)
+	}
 	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 }
+
+var apiCfg = new(apiConfig)
 
 func main() {
 	const (
@@ -57,7 +69,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("error opening db: %s", err)
 	}
-	dbQueries := database.New(db)
+
+	apiCfg.dbQueries = database.New(db)
+	apiCfg.platform = "dev"
 
 	mux := http.NewServeMux()
 	server := &http.Server{
@@ -66,11 +80,10 @@ func main() {
 		ReadHeaderTimeout: readTimeout,
 	}
 
-	apiCfg := new(apiConfig)
-
 	mux.Handle("/app/", http.StripPrefix("/app/", apiCfg.middlewareMetricsInc(http.FileServer(http.Dir(".")))))
 	mux.HandleFunc("GET /api/healthz", readinessHandler)
 	mux.HandleFunc("POST /api/validate_chirp", validateHandler)
+	mux.HandleFunc("POST /api/users", createUsersHandler)
 	mux.HandleFunc("GET /admin/metrics", apiCfg.showHits)
 	mux.HandleFunc("POST /admin/reset", apiCfg.resetHits)
 
