@@ -41,7 +41,7 @@ func createUsersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := apiCfg.dbQueries.CreateUser(context.TODO(), email.Email)
+	user, err := apiCfg.dbQueries.CreateUser(r.Context(), email.Email)
 	if err != nil {
 		w.WriteHeader(400)
 		w.Write([]byte(fmt.Sprintf(errJSON, "problem creating user")))

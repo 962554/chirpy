@@ -41,7 +41,7 @@ func (cfg *apiConfig) resetHits(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cfg.fileserverHits.Store(0)
-	err := cfg.dbQueries.DeleteUsers(context.TODO())
+	err := cfg.dbQueries.DeleteUsers(r.Context())
 	if err != nil {
 		log.Printf("error deleting users from db: %s", err)
 	}
