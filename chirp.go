@@ -51,7 +51,7 @@ func clean(in string) string {
 	words := strings.Split(in, " ")
 	cleaned := []string{}
 	for _, word := range words {
-		if profane[strings.ToLower(word)] == true {
+		if profane[strings.ToLower(word)] {
 			word = cleaner
 		}
 		cleaned = append(cleaned, word)
