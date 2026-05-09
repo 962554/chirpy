@@ -5,14 +5,19 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
+
+	"github.com/962554/chirpy/internal/database"
+	"github.com/google/uuid"
 )
 
 const (
-	errTooLong = `{"error": "Chirp is too long"}`
+	errTooLong = `{"error": "parameters is too long"}`
 	errChirp   = `{"error": "Something went wrong"}`
 	validChirp = `{"valid": true}`
 	cleaned    = `{"cleaned_body": %q}`
@@ -27,24 +32,112 @@ var profane = map[string]bool{
 }
 
 type Chirp struct {
-	Body string `json:"body"`
+	Id      uuid.UUID `json:"id"`
+	Created time.Time `json:"created_at"`
+	Updated time.Time `json:"updated_at"`
+	Body    string    `json:"body"`
+	UserID  uuid.UUID `json:"user_id"`
 }
 
-func validateHandler(w http.ResponseWriter, r *http.Request) {
+func createChirpHandler(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Body string    `json:"body"`
+		User uuid.UUID `json:"user_id"`
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 
 	decoder := json.NewDecoder(r.Body)
-	chirp := Chirp{}
-	err := decoder.Decode(&chirp)
+	params := parameters{}
+	err := decoder.Decode(&params)
 	if err != nil {
 		writeMessage(w, 400, []byte(errChirp))
 		return
 	}
-	if len(chirp.Body) > maxLength {
+	if len(params.Body) > maxLength {
 		writeMessage(w, 400, []byte(errTooLong))
 		return
 	}
-	writeMessage(w, http.StatusOK, fmt.Appendf([]byte{}, cleaned, clean(chirp.Body)))
+
+	chirp, err := apiCfg.dbQueries.CreateChirp(r.Context(), database.CreateChirpParams{Body: params.Body, UserID: params.User})
+	if err != nil {
+		writeMessage(w, 400, fmt.Appendf([]byte{}, errJSON, "problem creating params"))
+		return
+	}
+
+	c := Chirp{
+		Id:      chirp.ID,
+		Created: chirp.CreatedAt,
+		Updated: chirp.UpdatedAt,
+		Body:    chirp.Body,
+		UserID:  chirp.UserID,
+	}
+
+	dat, err := json.Marshal(c)
+	if err != nil {
+		writeMessage(w, 500, fmt.Appendf([]byte{}, errJSON, "problem marshalling chirp to JSON"))
+		return
+	}
+	writeMessage(w, 201, dat)
+}
+
+func allChirpsHandler(w http.ResponseWriter, r *http.Request) {
+	chirps, err := apiCfg.dbQueries.AllChirps(r.Context())
+	if err != nil {
+		writeMessage(w, 400, fmt.Appendf([]byte{}, errJSON, "problem fetching all chirps"))
+		return
+	}
+
+	chirpsOut := []Chirp{}
+	for _, chirp := range chirps {
+		c := Chirp{
+			Id:      chirp.ID,
+			Created: chirp.CreatedAt,
+			Updated: chirp.UpdatedAt,
+			Body:    chirp.Body,
+			UserID:  chirp.UserID,
+		}
+		chirpsOut = append(chirpsOut, c)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	dat, err := json.Marshal(chirpsOut)
+	if err != nil {
+		writeMessage(w, 500, fmt.Appendf([]byte{}, errJSON, "problem marshalling chirps to JSON"))
+		return
+	}
+	writeMessage(w, 200, dat)
+}
+
+func getChirpHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	chirpID, err := uuid.Parse(r.PathValue("chirpID"))
+	if err != nil {
+		writeMessage(w, 500, fmt.Appendf([]byte{}, errJSON, "UUID parse error."))
+		return
+	}
+
+	chirp, err := apiCfg.dbQueries.GetChirp(r.Context(), chirpID)
+
+	if err == sql.ErrNoRows {
+		writeMessage(w, 404, fmt.Appendf([]byte{}, errJSON, "chirp not found"))
+		return
+	}
+
+	c := Chirp{
+		Id:      chirp.ID,
+		Created: chirp.CreatedAt,
+		Updated: chirp.UpdatedAt,
+		Body:    chirp.Body,
+		UserID:  chirp.UserID,
+	}
+
+	dat, err := json.Marshal(c)
+	if err != nil {
+		writeMessage(w, 500, fmt.Appendf([]byte{}, errJSON, "problem marshalling chirp to JSON"))
+		return
+	}
+	writeMessage(w, 200, dat)
 }
 
 func clean(in string) string {
