@@ -23,7 +23,7 @@ type User struct {
 	Id      uuid.UUID `json:"id"`
 	Created time.Time `json:"created_at"`
 	Updated time.Time `json:"updated_at"`
-	Email   string    `json:"parameters"`
+	Email   string    `json:"email"`
 }
 
 var chirpUser = User{}
