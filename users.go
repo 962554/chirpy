@@ -24,6 +24,7 @@ type User struct {
 	Created time.Time `json:"created_at"`
 	Updated time.Time `json:"updated_at"`
 	Email   string    `json:"email"`
+	Token   string    `json:"token"`
 }
 
 var chirpUser = User{}
@@ -73,8 +74,9 @@ func loginUserHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	type parameters struct {
-		Password string `json:"password"`
-		Email    string `json:"email"`
+		Password         string `json:"password"`
+		Email            string `json:"email"`
+		ExpiresInSeconds int    `json:"expires_in_seconds,omitempty"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -96,11 +98,24 @@ func loginUserHandler(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, 401, fmt.Appendf([]byte{}, errJSON, "Incorrect email or password"))
 		return
 	}
+
+	expiresIn := time.Hour
+	if params.ExpiresInSeconds > 0 && params.ExpiresInSeconds < 3600 {
+		expiresIn = time.Duration(params.ExpiresInSeconds * int(time.Second))
+	}
+
+	token, err := auth.MakeJWT(user.ID, apiCfg.jwtSecret, expiresIn)
+	if err != nil {
+		writeMessage(w, 400, fmt.Appendf([]byte{}, errJSON, fmt.Sprintf("problem creating JWT token: %v", err)))
+		return
+	}
+
 	chirpUser = User{
 		Id:      user.ID,
 		Created: user.CreatedAt,
 		Updated: user.UpdatedAt,
 		Email:   user.Email,
+		Token:   token,
 	}
 
 	dat, err := json.Marshal(chirpUser)

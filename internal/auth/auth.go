@@ -8,12 +8,21 @@ package auth
 
 import (
 	"encoding/json"
-	"log"
+	"errors"
+	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/alexedwards/argon2id"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+)
+
+const (
+	chirpyJWTIssuer = "chirpy-access"
+	authHeaderKey   = "Authorization"
+	bearerPrefix    = "Bearer "
 )
 
 // HashPassword hashes the provided password using argon2id.CreateHash
@@ -22,7 +31,6 @@ func HashPassword(password string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	log.Println("hash: original:", password, hashed)
 	return hashed, nil
 }
 
@@ -38,16 +46,53 @@ func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (str
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		Issuer:    "chirpy-access",
+		Issuer:    chirpyJWTIssuer,
 		IssuedAt:  &jwt.NumericDate{time.Now().UTC()},
 		ExpiresAt: &jwt.NumericDate{time.Now().Add(expiresIn)},
 		Subject:   string(uid),
 	})
 
-	return token.SignedString(tokenSecret)
+	return token.SignedString([]byte(tokenSecret))
 }
 
-// func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
-// jwt.ParseWithClaims(tokenString, claims jwt.Claims, keyFunc jwt.Keyfunc, options ...jwt.ParserOption)
+func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
+	token, err := jwt.ParseWithClaims(
+		tokenString,
+		&jwt.RegisteredClaims{},
+		func(*jwt.Token) (any, error) { return []byte(tokenSecret), nil },
+	)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	userUUID, err := token.Claims.GetSubject()
+	if err != nil {
+		return uuid.Nil, err
+	}
+	issuer, err := token.Claims.GetIssuer()
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if issuer != chirpyJWTIssuer {
+		return uuid.Nil, errors.New("invalid issuer")
+	}
+	uid, err := uuid.Parse(userUUID)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("invalid user ID: %w", err)
+	}
+	return uid, nil
+}
 
-// }
+func GetBearerToken(headers http.Header) (string, error) {
+	authz := headers.Get(authHeaderKey)
+	if authz == "" {
+		return "", errors.New("no auth header found")
+	}
+	token, found := strings.CutPrefix(authz, bearerPrefix)
+	if !found {
+		return "", errors.New("bearer prefix missing")
+	}
+	if token == "" {
+		return "", errors.New("bearer token is empty")
+	}
+	return token, nil
+}
