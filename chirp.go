@@ -47,7 +47,11 @@ func createChirpHandler(w http.ResponseWriter, r *http.Request) {
 
 	bearerToken, err := auth.GetBearerToken(r.Header)
 	if err != nil {
-		writeMessage(w, 400, fmt.Appendf([]byte{}, errJSON, fmt.Sprintf("problem getting bearer token: %v", err)))
+		writeMessage(
+			w,
+			400,
+			fmt.Appendf([]byte{}, errJSON, fmt.Sprintf("problem getting bearer token: %v", err)),
+		)
 		return
 	}
 

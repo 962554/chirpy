@@ -49,7 +49,10 @@ func createUsersHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeMessage(w, 400, fmt.Appendf([]byte{}, errJSON, "problem hashing password"))
 	}
-	user, err := apiCfg.dbQueries.CreateUser(r.Context(), database.CreateUserParams{Email: params.Email, HashedPassword: hash})
+	user, err := apiCfg.dbQueries.CreateUser(r.Context(), database.CreateUserParams{
+		Email:          params.Email,
+		HashedPassword: hash,
+	})
 	if err != nil {
 		writeMessage(w, 400, fmt.Appendf([]byte{}, errJSON, "problem creating user"))
 		return
@@ -106,7 +109,11 @@ func loginUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	token, err := auth.MakeJWT(user.ID, apiCfg.jwtSecret, expiresIn)
 	if err != nil {
-		writeMessage(w, 400, fmt.Appendf([]byte{}, errJSON, fmt.Sprintf("problem creating JWT token: %v", err)))
+		writeMessage(
+			w,
+			400,
+			fmt.Appendf([]byte{}, errJSON, fmt.Sprintf("problem creating JWT token: %v", err)),
+		)
 		return
 	}
 

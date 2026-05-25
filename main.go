@@ -46,7 +46,10 @@ func main() {
 		ReadHeaderTimeout: readTimeout,
 	}
 
-	mux.Handle("/app/", http.StripPrefix("/app/", apiCfg.middlewareMetricsInc(http.FileServer(http.Dir(".")))))
+	mux.Handle(
+		"/app/",
+		http.StripPrefix("/app/", apiCfg.middlewareMetricsInc(http.FileServer(http.Dir(".")))),
+	)
 	mux.HandleFunc("GET /api/healthz", readinessHandler)
 	mux.HandleFunc("POST /api/users", createUsersHandler)
 	mux.HandleFunc("POST /api/login", loginUserHandler)
