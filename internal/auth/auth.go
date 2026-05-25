@@ -41,8 +41,8 @@ func CheckPasswordHash(password, hash string) (bool, error) {
 func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
 		Issuer:    chirpyJWTIssuer,
-		IssuedAt:  &jwt.NumericDate{time.Now().UTC()},
-		ExpiresAt: &jwt.NumericDate{time.Now().Add(expiresIn)},
+		IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiresIn)),
 		Subject:   userID.String(),
 	})
 
