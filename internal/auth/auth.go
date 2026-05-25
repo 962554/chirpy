@@ -7,7 +7,6 @@
 package auth
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -40,16 +39,11 @@ func CheckPasswordHash(password, hash string) (bool, error) {
 }
 
 func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error) {
-	uid, err := json.Marshal(userID)
-	if err != nil {
-		return "", err
-	}
-
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
 		Issuer:    chirpyJWTIssuer,
 		IssuedAt:  &jwt.NumericDate{time.Now().UTC()},
 		ExpiresAt: &jwt.NumericDate{time.Now().Add(expiresIn)},
-		Subject:   string(uid),
+		Subject:   userID.String(),
 	})
 
 	return token.SignedString([]byte(tokenSecret))
