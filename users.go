@@ -5,6 +5,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -20,11 +21,12 @@ const (
 )
 
 type User struct {
-	Id      uuid.UUID `json:"id"`
-	Created time.Time `json:"created_at"`
-	Updated time.Time `json:"updated_at"`
-	Email   string    `json:"email"`
-	Token   string    `json:"token"`
+	Id           uuid.UUID `json:"id"`
+	Created      time.Time `json:"created_at"`
+	Updated      time.Time `json:"updated_at"`
+	Email        string    `json:"email"`
+	Token        string    `json:"token"`
+	RefreshToken string    `json:"refresh_token"`
 }
 
 var chirpUser = User{}
@@ -77,9 +79,8 @@ func loginUserHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	type parameters struct {
-		Password         string `json:"password"`
-		Email            string `json:"email"`
-		ExpiresInSeconds int    `json:"expires_in_seconds,omitempty"`
+		Password string `json:"password"`
+		Email    string `json:"email"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -103,26 +104,34 @@ func loginUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	expiresIn := time.Hour
-	if params.ExpiresInSeconds > 0 && params.ExpiresInSeconds < 3600 {
-		expiresIn = time.Duration(params.ExpiresInSeconds * int(time.Second))
-	}
 
-	token, err := auth.MakeJWT(user.ID, apiCfg.jwtSecret, expiresIn)
+	jwtToken, err := auth.MakeJWT(user.ID, apiCfg.jwtSecret, expiresIn)
 	if err != nil {
 		writeMessage(
 			w,
 			400,
-			fmt.Appendf([]byte{}, errJSON, fmt.Sprintf("problem creating JWT token: %v", err)),
+			fmt.Appendf([]byte{}, errJSON, fmt.Sprintf("problem creating JWT jwtToken: %v", err)),
 		)
 		return
 	}
 
+	refreshToken := auth.MakeRefreshToken()
+	err = apiCfg.dbQueries.AddToken(r.Context(), database.AddTokenParams{
+		Token:  refreshToken,
+		UserID: user.ID,
+	})
+	if err != nil {
+		writeMessage(w, 400, fmt.Appendf([]byte{}, errJSON, "problem adding refreshToken to db"))
+		return
+	}
+
 	chirpUser = User{
-		Id:      user.ID,
-		Created: user.CreatedAt,
-		Updated: user.UpdatedAt,
-		Email:   user.Email,
-		Token:   token,
+		Id:           user.ID,
+		Created:      user.CreatedAt,
+		Updated:      user.UpdatedAt,
+		Email:        user.Email,
+		Token:        jwtToken,
+		RefreshToken: refreshToken,
 	}
 
 	dat, err := json.Marshal(chirpUser)
@@ -131,4 +140,88 @@ func loginUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeMessage(w, 200, dat)
+}
+
+func refreshTokenHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	bearerToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		writeMessage(
+			w,
+			400,
+			fmt.Appendf([]byte{}, errJSON, fmt.Sprintf("problem getting bearer token: %v", err)),
+		)
+		return
+	}
+
+	refreshToken, err := apiCfg.dbQueries.GetToken(r.Context(), bearerToken)
+	// if err != nil {
+	// 	writeMessage(
+	// 		w,
+	// 		400,
+	// 		fmt.Appendf([]byte{}, errJSON, fmt.Sprintf("problem getting refresh token from db: %v", err)),
+	// 	)
+	// 	return
+	// }
+	if err == sql.ErrNoRows || refreshToken.ExpiresAt.Before(time.Now()) || refreshToken.RevokedAt.Valid {
+		writeMessage(
+			w,
+			401,
+			fmt.Appendf([]byte{}, errJSON, "problem with refresh token"),
+		)
+		return
+	}
+	var jwtToken string
+	if refreshToken.Token == bearerToken {
+		jwtToken, err = auth.MakeJWT(refreshToken.UserID, apiCfg.jwtSecret, time.Hour)
+		if err != nil {
+			writeMessage(
+				w,
+				400,
+				fmt.Appendf([]byte{}, errJSON, fmt.Sprintf("problem creating JWT jwtToken: %v", err)),
+			)
+			return
+		}
+	}
+	dat, err := json.Marshal(struct {
+		Token string `json:"token"`
+	}{
+		Token: jwtToken,
+	})
+	if err != nil {
+		writeMessage(w, 500, fmt.Appendf([]byte{}, errJSON, "problem marshalling jwtToken to JSON"))
+		return
+	}
+	writeMessage(w, 200, dat)
+}
+
+func revokeTokenHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	bearerToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		writeMessage(
+			w,
+			400,
+			fmt.Appendf([]byte{}, errJSON, fmt.Sprintf("problem getting bearer token: %v", err)),
+		)
+		return
+	}
+
+	err = apiCfg.dbQueries.RevokeToken(r.Context(), bearerToken)
+	if err != nil {
+		writeMessage(
+			w,
+			400,
+			fmt.Appendf([]byte{}, errJSON, fmt.Sprintf("problem getting bearer token: %v", err)),
+		)
+		return
+	}
+	writeMessage(
+		w,
+		204,
+		fmt.Append([]byte{}, ""),
+	)
+	return
 }
