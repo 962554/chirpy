@@ -21,12 +21,10 @@ const (
 )
 
 type User struct {
-	Id           uuid.UUID `json:"id"`
-	Created      time.Time `json:"created_at"`
-	Updated      time.Time `json:"updated_at"`
-	Email        string    `json:"email"`
-	Token        string    `json:"token"`
-	RefreshToken string    `json:"refresh_token"`
+	Id      uuid.UUID `json:"id"`
+	Created time.Time `json:"created_at"`
+	Updated time.Time `json:"updated_at"`
+	Email   string    `json:"email"`
 }
 
 var chirpUser = User{}
@@ -83,6 +81,12 @@ func loginUserHandler(w http.ResponseWriter, r *http.Request) {
 		Email    string `json:"email"`
 	}
 
+	type response struct {
+		User
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
 	err := decoder.Decode(&params)
@@ -125,16 +129,83 @@ func loginUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chirpUser = User{
-		Id:           user.ID,
-		Created:      user.CreatedAt,
-		Updated:      user.UpdatedAt,
-		Email:        user.Email,
+	resp := response{
+		User: User{
+			Id:      user.ID,
+			Created: user.CreatedAt,
+			Updated: user.UpdatedAt,
+			Email:   user.Email,
+		},
 		Token:        jwtToken,
 		RefreshToken: refreshToken,
 	}
 
-	dat, err := json.Marshal(chirpUser)
+	dat, err := json.Marshal(resp)
+	if err != nil {
+		writeMessage(w, 500, fmt.Appendf([]byte{}, errJSON, "problem marshalling user to JSON"))
+		return
+	}
+	writeMessage(w, 200, dat)
+}
+
+func updateUserHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	type parameters struct {
+		Password string `json:"password"`
+		Email    string `json:"email"`
+	}
+
+	type response struct {
+		User
+	}
+
+	bearerToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		writeMessage(
+			w,
+			401,
+			fmt.Appendf([]byte{}, errJSON, fmt.Sprintf("problem getting bearer token: %v", err)),
+		)
+		return
+	}
+
+	uid, err := auth.ValidateJWT(bearerToken, apiCfg.jwtSecret)
+	if err != nil {
+		writeMessage(w, 401, fmt.Appendf([]byte{}, errJSON, err.Error()))
+		return
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err = decoder.Decode(&params)
+	if err != nil {
+		writeMessage(w, 400, fmt.Appendf([]byte{}, errJSON, "problem decoding parameters"))
+		return
+	}
+
+	hash, err := auth.HashPassword(params.Password)
+	if err != nil {
+		writeMessage(w, 400, fmt.Appendf([]byte{}, errJSON, "problem hashing password"))
+	}
+
+	u, err := apiCfg.dbQueries.UpdateUser(r.Context(), database.UpdateUserParams{
+		HashedPassword: hash,
+		Email:          params.Email,
+		ID:             uid,
+	})
+	if err != nil {
+		writeMessage(w, 401, fmt.Appendf([]byte{}, errJSON, "problem updating user"))
+	}
+	resp := response{
+		User: User{
+			Id:      u.ID,
+			Created: u.CreatedAt,
+			Updated: u.UpdatedAt,
+			Email:   u.Email,
+		},
+	}
+	dat, err := json.Marshal(resp)
 	if err != nil {
 		writeMessage(w, 500, fmt.Appendf([]byte{}, errJSON, "problem marshalling user to JSON"))
 		return
