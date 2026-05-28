@@ -159,6 +159,52 @@ func getChirpHandler(w http.ResponseWriter, r *http.Request) {
 	writeMessage(w, 200, dat)
 }
 
+func deleteChirpHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	bearerToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		writeMessage(
+			w,
+			401,
+			fmt.Appendf([]byte{}, errJSON, fmt.Sprintf("problem getting bearer token: %v", err)),
+		)
+		return
+	}
+
+	uid, err := auth.ValidateJWT(bearerToken, apiCfg.jwtSecret)
+	if err != nil {
+		writeMessage(w, 401, fmt.Appendf([]byte{}, errJSON, err.Error()))
+		return
+	}
+
+	chirpID, err := uuid.Parse(r.PathValue("chirpID"))
+	if err != nil {
+		writeMessage(w, 500, fmt.Appendf([]byte{}, errJSON, "UUID parse error."))
+		return
+	}
+
+	chirp, err := apiCfg.dbQueries.GetChirp(r.Context(), chirpID)
+
+	if err == sql.ErrNoRows {
+		writeMessage(w, 404, fmt.Appendf([]byte{}, errJSON, "chirp not found"))
+		return
+	}
+
+	if chirp.UserID != uid {
+		writeMessage(w, 403, fmt.Appendf([]byte{}, errJSON, "chirp not owned by user"))
+		return
+	}
+
+	err = apiCfg.dbQueries.DeleteChirp(r.Context(), chirpID)
+	if err != nil {
+		writeMessage(w, 404, fmt.Appendf([]byte{}, errJSON, "problem deleting chirp from db"))
+		return
+	}
+
+	writeMessage(w, 204, []byte{})
+}
+
 func clean(in string) string {
 	words := strings.Split(in, " ")
 	cleaned := []string{}

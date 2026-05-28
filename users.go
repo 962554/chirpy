@@ -294,5 +294,4 @@ func revokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 		204,
 		fmt.Append([]byte{}, ""),
 	)
-	return
 }
