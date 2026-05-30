@@ -24,6 +24,7 @@ const (
 	chirpyJWTIssuer = "chirpy-access"
 	authHeaderKey   = "Authorization"
 	bearerPrefix    = "Bearer "
+	apiKeyPrefix    = "ApiKey "
 )
 
 // HashPassword hashes the provided password using argon2id.CreateHash
@@ -97,4 +98,19 @@ func MakeRefreshToken() string {
 	token := make([]byte, 32)
 	_, _ = rand.Read(token)
 	return hex.EncodeToString(token)
+}
+
+func GetAPIKey(headers http.Header) (string, error) {
+	authz := headers.Get(authHeaderKey)
+	if authz == "" {
+		return "", errors.New("no auth header found")
+	}
+	apiKey, found := strings.CutPrefix(authz, apiKeyPrefix)
+	if !found {
+		return "", errors.New("apiKey prefix missing")
+	}
+	if apiKey == "" {
+		return "", errors.New("apiKey apiKey is empty")
+	}
+	return apiKey, nil
 }

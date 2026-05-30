@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/962554/chirpy/internal/auth"
 	"github.com/google/uuid"
 )
 
@@ -18,6 +19,21 @@ const userEvent = "user.upgraded"
 
 func webhookHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+
+	apiKey, err := auth.GetAPIKey(r.Header)
+	if err != nil {
+		writeMessage(
+			w,
+			401,
+			fmt.Appendf([]byte{}, errJSON, fmt.Sprintf("problem getting api key: %v", err)),
+		)
+		return
+	}
+
+	if apiKey != apiCfg.polkaAPIKey {
+		writeMessage(w, 401, fmt.Appendf([]byte{}, errJSON, "invalid Polka API Key provided"))
+		return
+	}
 
 	type parameters struct {
 		Event string `json:"event"`
@@ -28,7 +44,7 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		writeMessage(w, 500, fmt.Appendf([]byte{}, errJSON, "problem decoding parameters"))
 		return

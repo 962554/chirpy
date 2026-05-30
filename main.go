@@ -30,7 +30,18 @@ func main() {
 
 	godotenv.Load()
 	dbURL := os.Getenv("DB_URL")
+	if dbURL == "" {
+		log.Fatal("no DB URL provided")
+	}
+
 	apiCfg.jwtSecret = os.Getenv("JWT_SECRET")
+	if apiCfg.jwtSecret == "" {
+		log.Fatal("no JWT Secret provided")
+	}
+	apiCfg.polkaAPIKey = os.Getenv("POLKA_KEY")
+	if apiCfg.platform == "" {
+		log.Fatal("no Polka API Key provided")
+	}
 
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
