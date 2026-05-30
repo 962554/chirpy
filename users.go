@@ -25,6 +25,7 @@ type User struct {
 	Created time.Time `json:"created_at"`
 	Updated time.Time `json:"updated_at"`
 	Email   string    `json:"email"`
+	IsRed   bool      `json:"is_chirpy_red"`
 }
 
 var chirpUser = User{}
@@ -63,6 +64,7 @@ func createUsersHandler(w http.ResponseWriter, r *http.Request) {
 		Created: user.CreatedAt,
 		Updated: user.UpdatedAt,
 		Email:   user.Email,
+		IsRed:   user.IsChirpyRed,
 	}
 
 	dat, err := json.Marshal(chirpUser)
@@ -135,6 +137,7 @@ func loginUserHandler(w http.ResponseWriter, r *http.Request) {
 			Created: user.CreatedAt,
 			Updated: user.UpdatedAt,
 			Email:   user.Email,
+			IsRed:   user.IsChirpyRed,
 		},
 		Token:        jwtToken,
 		RefreshToken: refreshToken,
@@ -203,6 +206,7 @@ func updateUserHandler(w http.ResponseWriter, r *http.Request) {
 			Created: u.CreatedAt,
 			Updated: u.UpdatedAt,
 			Email:   u.Email,
+			IsRed:   u.IsChirpyRed,
 		},
 	}
 	dat, err := json.Marshal(resp)
@@ -227,14 +231,6 @@ func refreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	refreshToken, err := apiCfg.dbQueries.GetToken(r.Context(), bearerToken)
-	// if err != nil {
-	// 	writeMessage(
-	// 		w,
-	// 		400,
-	// 		fmt.Appendf([]byte{}, errJSON, fmt.Sprintf("problem getting refresh token from db: %v", err)),
-	// 	)
-	// 	return
-	// }
 	if err == sql.ErrNoRows || refreshToken.ExpiresAt.Before(time.Now()) || refreshToken.RevokedAt.Valid {
 		writeMessage(
 			w,

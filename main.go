@@ -57,6 +57,7 @@ func main() {
 	mux.HandleFunc("GET /api/chirps", allChirpsHandler)
 	mux.HandleFunc("GET /api/chirps/{chirpID}", getChirpHandler)
 	mux.HandleFunc("DELETE /api/chirps/{chirpID}", deleteChirpHandler)
+	mux.HandleFunc("POST /api/polka/webhooks", webhookHandler)
 	mux.HandleFunc("POST /api/refresh", refreshTokenHandler)
 	mux.HandleFunc("POST /api/revoke", revokeTokenHandler)
 	mux.HandleFunc("PUT /api/users", updateUserHandler)
