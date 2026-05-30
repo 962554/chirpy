@@ -101,7 +101,20 @@ func createChirpHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func allChirpsHandler(w http.ResponseWriter, r *http.Request) {
-	chirps, err := apiCfg.dbQueries.AllChirps(r.Context())
+	author_id := r.URL.Query().Get("author_id")
+	var err error
+	var chirps []database.Chirp
+	if author_id == "" {
+		chirps, err = apiCfg.dbQueries.AllChirps(r.Context())
+	} else {
+		user_id, err := uuid.Parse(author_id)
+		if err != nil {
+			writeMessage(w, 400, fmt.Appendf([]byte{}, errJSON, "problem parsing author_id"))
+			return
+		}
+		chirps, err = apiCfg.dbQueries.GetUserChirps(r.Context(), user_id)
+	}
+
 	if err != nil {
 		writeMessage(w, 400, fmt.Appendf([]byte{}, errJSON, "problem fetching all chirps"))
 		return
