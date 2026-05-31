@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -102,6 +103,7 @@ func createChirpHandler(w http.ResponseWriter, r *http.Request) {
 
 func allChirpsHandler(w http.ResponseWriter, r *http.Request) {
 	author_id := r.URL.Query().Get("author_id")
+	sortOrder := r.URL.Query().Get("sort")
 	var err error
 	var chirps []database.Chirp
 	if author_id == "" {
@@ -120,6 +122,9 @@ func allChirpsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if sortOrder == "desc" {
+		sort.Slice(chirps, func(i, j int) bool { return chirps[i].CreatedAt.After(chirps[j].CreatedAt) })
+	}
 	chirpsOut := []Chirp{}
 	for _, chirp := range chirps {
 		c := Chirp{
